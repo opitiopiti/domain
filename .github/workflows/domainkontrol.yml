@@ -1,0 +1,97 @@
+name: Domain Link Güncelleyici
+
+on:
+  schedule:
+    - cron: "0 */1 * * *"  # Her saatte bir
+  workflow_dispatch:       # Manuel tetikleme
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Domain linklerini kontrol et ve güncelle
+        id: updater
+        run: |
+          import os, requests, subprocess
+
+          def resolve_final_url(url):
+              try:
+                  r = requests.get(url, allow_redirects=True, timeout=10, stream=True)
+                  final = r.url
+                  r.close()
+                  return final
+              except requests.RequestException:
+                  return None
+
+          changes_made = False
+
+          # --- Özel dosya kontrolü: hdfilmcehennemi.txt ---
+          special_file = "hdfilmcehennemi.txt"
+          special_url = "https://hdfilmcehennemi.download/download/"
+          if os.path.exists(special_file):
+              final = resolve_final_url(special_url)
+              if final is not None:
+                  normalized_final = final.rstrip("/")
+                  with open(special_file, "r", encoding="utf-8") as f:
+                      current_content = f.read().strip()
+                  if normalized_final != current_content:
+                      with open(special_file, "w", encoding="utf-8") as f:
+                          f.write(normalized_final + "\n")
+                      print(f"Hdfilmcehennemi\n🔀 Özel site kontrolü yapıldı.\nURL: {special_url} → {normalized_final} ({special_file} güncellendi)\n")
+                      subprocess.run(["git", "add", special_file])
+                      changes_made = True
+                  else:
+                      print(f"Hdfilmcehennemi\n✅ URL değişmemiş. Commit atılmadı.\n")
+              else:
+                  print(f"Hdfilmcehennemi\n❌ Özel siteye erişilemedi veya yönlendirme yok.\nURL: {special_url}\n")
+
+          # --- Diğer tüm txt dosyalar için normal kontrol ---
+          for fname in os.listdir("."):
+              if not fname.endswith(".txt") or fname in ["hesapkontrol.txt", special_file]:
+                  continue
+
+              path = os.path.join(".", fname)
+              with open(path, "r", encoding="utf-8") as f:
+                  url = f.read().strip()
+
+              if not url:
+                  continue
+
+              final = resolve_final_url(url)
+              domain_name = os.path.splitext(fname)[0].capitalize()
+
+              if final is None:
+                  print(f"{domain_name}\n❌ Domain kapanmış olabilir, yönlendirme veya domaine erişim yok.\nKontrol edilmesi gerekiyor.\nURL: {url}\n")
+                  continue
+
+              normalized_final = final.rstrip("/")
+              normalized_url = url.rstrip("/")
+
+              if normalized_final != normalized_url:
+                  with open(path, "w", encoding="utf-8") as f:
+                      f.write(normalized_final + "\n")
+                  print(f"{domain_name}\n🔀 Domain yönlendirmesi bulundu.\nURL: {url} → {normalized_final} (txt dosyası güncellendi)\n")
+                  subprocess.run(["git", "add", path])
+                  changes_made = True
+              else:
+                  print(f"{domain_name}\n✅ Domain hala geçerlidir.\nURL: {url}\n")
+
+          # --- Commit ve push işlemi yalnızca değişiklik varsa ---
+          if changes_made:
+              subprocess.run(["git", "config", "user.name", "github-actions[bot]"])
+              subprocess.run(["git", "config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"])
+              subprocess.run(["git", "commit", "-m", "Domain linkleri güncellendi"])
+              subprocess.run(["git", "push"])
+        shell: python

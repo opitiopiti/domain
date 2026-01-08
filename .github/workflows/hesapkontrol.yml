@@ -1,0 +1,50 @@
+name: Run Hesap ve Calisan Kontrol Etme 
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */2 * * *"  # Her 2 saatte bir
+
+jobs:
+  run-hesapkontrol:
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+    steps:
+      - name: Checkout This Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Clone Private Py Repo
+        run: |
+          git clone https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/zerodayip/Py.git private_py
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run Hesap Kontrol Script
+        run: python private_py/proxyhesapları/hesapkontol.py
+
+      - name: Run Calisan Kontrol Script
+        run: python private_py/proxyhesapları/calisankontrol.py
+
+  #    - name: Commit hesapkontrol.txt
+  #      run: |
+  #        git config user.name "GitHub Actions"
+  #        git config user.email "actions@github.com"
+  #        git pull --rebase origin main || echo "Pull yapılamadı"
+  #        git add hesapkontrol.txt || echo "hesapkontrol yok"
+  #        git diff --cached --quiet || git commit -m "Hesap Kontrol güncellendi [auto]"
+  #        git push origin main
+

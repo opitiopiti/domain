@@ -1,0 +1,129 @@
+name: Son Eklenen Dizileri Kontrol Etme
+
+on:
+  schedule:
+    - cron: "0 */12 * * *"  # Her 12 saatte bir
+  workflow_dispatch:
+
+env:
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Python'u Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Gerekli Kütüphaneleri Yükle
+        run: |
+          pip install requests beautifulsoup4
+
+      - name: Scraper'ı Çalıştır ve Telegram'a Gönder
+        run: |
+          python - <<EOF
+          import os
+          import requests
+          from bs4 import BeautifulSoup
+
+          TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+          TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+          def send_telegram(msg: str):
+              if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+                  return
+              try:
+                  url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+                  requests.post(
+                      url,
+                      json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "Markdown"},
+                      timeout=5
+                  )
+              except Exception:
+                  pass
+
+          def safe_get(url, headers):
+              try:
+                  return requests.get(url, headers=headers, timeout=10)
+              except requests.exceptions.RequestException:
+                  return None
+
+          message = "📺 *SON DİZİLER*\n"
+
+          # ------------------- DIZIPALL -------------------
+          domain_url = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipall.txt"
+          domain = requests.get(domain_url).text.strip()
+          url = f"{domain}/kesfet"
+          headers = {"User-Agent": "Mozilla/5.0", "Referer": domain}
+
+          response = safe_get(url, headers)
+          if response and response.status_code == 200:
+              soup = BeautifulSoup(response.text, "html.parser")
+              message += f"\n🌐 {domain}\n"
+              items = soup.find_all("div", class_="filter-result-box")
+              for item in items:
+                  title = item.find("h2").get_text(strip=True) if item.find("h2") else "BİLİNMİYOR"
+                  year = "BİLİNMİYOR"
+                  bottom = item.find("div", class_="filter-result-box-bottom")
+                  if bottom:
+                      p = bottom.find("p")
+                      if p:
+                          year = p.get_text(strip=True)
+                  message += f"{title} - {year}\n"
+          else:
+              message += f"\n❌ {domain} ulaşılamıyor (site kapanmış olabilir).\n"
+
+          # ------------------- DIZIYIIZLE -------------------
+          domain_url2 = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/diziyiizle.txt"
+          domain2 = requests.get(domain_url2).text.strip()
+          url2 = f"{domain2}/kesfet-izle/"
+          headers2 = {"User-Agent": "Mozilla/5.0", "Referer": domain2}
+
+          response2 = safe_get(url2, headers2)
+          if response2 and response2.status_code == 200:
+              soup2 = BeautifulSoup(response2.text, "html.parser")
+              message += f"\n🌐 {domain2}\n"
+              cards = soup2.select("#seriesGrid a")
+              for card in cards:
+                  img = card.find("img")
+                  title = img.get("alt", "BİLİNMİYOR") if img else "BİLİNMİYOR"
+                  year = "BİLİNMİYOR"
+                  year_tag = card.find("div", class_="flex items-center space-x-2 text-sm text-gray-400")
+                  if year_tag:
+                      span = year_tag.find("span")
+                      if span:
+                          year = span.get_text(strip=True)
+                  message += f"{title} - {year}\n"
+          else:
+              message += f"\n❌ {domain2} ulaşılamıyor (site kapanmış olabilir).\n"
+
+          # ------------------- DIZIPAL2 -------------------
+          domain_url3 = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipal2.txt"
+          domain3 = requests.get(domain_url3).text.strip()
+          url3 = f"{domain3}/"
+          headers3 = {
+              "User-Agent": "Mozilla/5.0",
+              "Referer": "https://google.com/"
+          }
+
+          response3 = safe_get(url3, headers3)
+          if response3 and response3.status_code == 200:
+              soup3 = BeautifulSoup(response3.text, "html.parser")
+              target_div = soup3.find("div", {"class": "aa-cn", "id": "widget_list_movies_series-2-aa-movies"})
+              message += f"\n🌐 {domain3}\n"
+              if target_div:
+                  titles = target_div.find_all("h2", class_="entry-title")
+                  for title in titles:
+                      message += f"{title.get_text(strip=True)}\n"
+              else:
+                  message += "Div bulunamadı.\n"
+          else:
+              message += f"\n❌ {domain3} ulaşılamıyor (site kapanmış olabilir).\n"
+
+          # Telegram'a gönder
+          send_telegram(message)
+          EOF
