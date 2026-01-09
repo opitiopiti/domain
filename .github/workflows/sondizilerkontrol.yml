@@ -55,7 +55,7 @@ jobs:
           message = "📺 *SON DİZİLER*\n"
 
           # ------------------- DIZIPALL -------------------
-          domain_url = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipall.txt"
+          domain_url = "https://raw.githubusercontent.com/opitiopiti/domain/refs/heads/main/dizipall.txt"
           domain = requests.get(domain_url).text.strip()
           url = f"{domain}/kesfet"
           headers = {"User-Agent": "Mozilla/5.0", "Referer": domain}
@@ -78,7 +78,7 @@ jobs:
               message += f"\n❌ {domain} ulaşılamıyor (site kapanmış olabilir).\n"
 
           # ------------------- DIZIYIIZLE -------------------
-          domain_url2 = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/diziyiizle.txt"
+          domain_url2 = "https://raw.githubusercontent.com/opitiopiti/domain/refs/heads/main/diziyiizle.txt"
           domain2 = requests.get(domain_url2).text.strip()
           url2 = f"{domain2}/kesfet-izle/"
           headers2 = {"User-Agent": "Mozilla/5.0", "Referer": domain2}
@@ -102,7 +102,7 @@ jobs:
               message += f"\n❌ {domain2} ulaşılamıyor (site kapanmış olabilir).\n"
 
           # ------------------- DIZIPAL2 -------------------
-          domain_url3 = "https://raw.githubusercontent.com/zerodayip/domain/refs/heads/main/dizipal2.txt"
+          domain_url3 = "https://raw.githubusercontent.com/opitiopiti/domain/refs/heads/main/dizipal2.txt"
           domain3 = requests.get(domain_url3).text.strip()
           url3 = f"{domain3}/"
           headers3 = {
