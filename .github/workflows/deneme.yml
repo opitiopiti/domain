@@ -1,11 +1,11 @@
-name: Deneme
+name: Domain Py Haline Getirildi
 
 on:
   # Manuel başlatma
   workflow_dispatch:
 
-  schedule:
-    - cron: '0 */12 * * *' 
+#  schedule:
+#    - cron: '0 */12 * * *' 
     
 jobs:
   cleanup:
