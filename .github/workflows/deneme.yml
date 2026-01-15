@@ -1,0 +1,33 @@
+name: Deneme
+
+on:
+  # Manuel başlatma
+  workflow_dispatch:
+
+  schedule:
+    - cron: '0 */12 * * *' 
+    
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ana repo'yu çek
+        uses: actions/checkout@v4
+
+      - name: Python kurulumu
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Py repo'sunu klonla
+        run: |
+          git clone https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/opitiopiti/Py.git private_py
+
+      - name: requests kütüphanesini yükle
+        run: pip install requests
+
+      - name: Workflow geçmişini sil
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: python private_py/domainrepo/domainlinkupdate.py
