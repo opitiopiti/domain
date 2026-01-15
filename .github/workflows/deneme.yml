@@ -31,3 +31,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: python private_py/domainrepo/domainlinkupdate.py
+
+      - name: Sadece .txt dosyalarını commit et
+        run: |
+         git config user.name "GitHub Actions"
+         git config user.email "actions@github.com"
+         git pull --rebase origin main || echo "Pull yapılamadı"
+         # SADECE .txt dosyaları ekle
+         git add '*.txt' || echo "Eklenecek txt yok"
+         # Eğer gerçekten değişiklik yoksa commit atma
+         git diff --cached --quiet || git commit -m "TXT dosyaları güncellendi [auto]"
+         git push origin main
