@@ -33,9 +33,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run Hesap Kontrol Script
-        run: python private_py/proxyhesapları/hesapkontol.py
-
       - name: Run Calisan Kontrol Script
         run: python private_py/proxyhesapları/calisankontrol.py
 
