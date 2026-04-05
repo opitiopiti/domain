@@ -34,7 +34,7 @@ jobs:
           pip install requests
 
       - name: Run Calisan Kontrol Script
-        run: python private_py/proxyhesapları/calisankontrol.py
+        run: python private_py/genelkodlar/sistemkontrol.py
 
   #    - name: Commit hesapkontrol.txt
   #      run: |
