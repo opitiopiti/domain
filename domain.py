@@ -3,15 +3,16 @@ import re
 import requests
 from collections import defaultdict
 from random import choice
+from urllib.parse import urlparse
 
-BASE_DIR = "./"  # Ana dizin
+BASE_DIR = "./"
 
 DOMAIN_REGEX = r"https?://([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})"
 
 domain_sources = defaultdict(set)
 seen_domains = set()
 
-# Proxy raw dosyaları
+# Proxy kaynakları (GitHub raw)
 PROXY_URLS = [
     "https://raw.githubusercontent.com/opitiopiti/yenisistem/refs/heads/main/dizipod/pro.txt",
     "https://raw.githubusercontent.com/opitiopiti/yenisistem/refs/heads/main/sinewix/pro.txt"
@@ -19,45 +20,86 @@ PROXY_URLS = [
 
 # Proxyleri çek
 proxies_list = []
+
 for url in PROXY_URLS:
     try:
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=10)
         r.raise_for_status()
-        proxies_list.extend([line.strip() for line in r.text.split() if line.strip()])
-    except Exception as e:
-        print(f"Proxy fetch error from {url}: {e}")
 
-print(f"Loaded {len(proxies_list)} proxies.")
+        # satır satır proxy
+        proxies_list.extend([
+            line.strip()
+            for line in r.text.splitlines()
+            if line.strip()
+        ])
+
+    except Exception as e:
+        print(f"Proxy fetch error: {url} -> {e}")
+
+print(f"[INFO] Loaded {len(proxies_list)} proxies")
 
 
 def extract_domains(text):
     return re.findall(DOMAIN_REGEX, text)
 
 
+def try_request(url, proxies=None):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+
+    try:
+        if proxies:
+            r = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+                proxies=proxies,
+                allow_redirects=True
+            )
+        else:
+            r = requests.get(
+                url,
+                headers=headers,
+                timeout=10,
+                allow_redirects=True
+            )
+
+        final_url = r.url
+        final_domain = urlparse(final_url).netloc
+
+        return r.status_code, final_domain
+
+    except:
+        return None, None
+
+
 def get_with_proxies(domain):
     url = f"http://{domain}"
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
-    # Önce normal istek
-    try:
-        r = requests.get(url, headers=headers, timeout=5)
-        if r.status_code != 403:
-            return r.status_code
-        print(f"[403] {url} -> Trying proxies...")
-    except:
-        print(f"[ERROR] {url} -> Trying proxies...")
+    # 1) normal dene
+    status, final_domain = try_request(url)
 
-    # Proxy ile deneme
+    if status and status != 403:
+        return status, final_domain
+
+    print(f"[403/ERROR] {url} -> proxy denenecek")
+
+    # 2) proxy dene
     for _ in range(len(proxies_list)):
         proxy = choice(proxies_list)
-        proxy_dict = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-        try:
-            r = requests.get(url, headers=headers, proxies=proxy_dict, timeout=5)
-            if r.status_code != 403:
-                return r.status_code
-        except:
-            continue
-    return None
+
+        proxy_dict = {
+            "http": f"http://{proxy}",
+            "https": f"http://{proxy}"
+        }
+
+        status, final_domain = try_request(url, proxies=proxy_dict)
+
+        if status and status != 403:
+            return status, final_domain
+
+    return None, None
 
 
 def process_file(file_path):
@@ -67,14 +109,17 @@ def process_file(file_path):
     domains = extract_domains(content)
 
     for domain in domains:
-        status = get_with_proxies(domain)
+
+        status, final_domain = get_with_proxies(domain)
+
         if status:
-            print(f"[OK] http://{domain} -> {status}")
+            print(f"[OK] {domain} -> {status} (final: {final_domain})")
         else:
-            print(f"[FAILED] http://{domain}")
+            print(f"[FAILED] {domain}")
 
         if domain not in seen_domains:
             seen_domains.add(domain)
+
         domain_sources[domain].add(file_path)
 
 
@@ -82,7 +127,7 @@ def scan_repo(base_dir):
     for file in os.listdir(base_dir):
         if file.endswith(".txt"):
             full_path = os.path.join(base_dir, file)
-            print(f"Processing: {full_path}")
+            print(f"\nProcessing: {full_path}")
             process_file(full_path)
 
 
