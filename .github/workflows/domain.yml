@@ -1,7 +1,10 @@
 name: Domain Check
 
 on:
-  workflow_dispatch: # manuel tetikleme için
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-domain-check:
@@ -24,3 +27,14 @@ jobs:
       - name: Run domain script
         run: |
           python domain.py
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --cached --quiet || git commit -m "Update domains with final URLs"
+
+      - name: Push changes
+        run: |
+          git push
