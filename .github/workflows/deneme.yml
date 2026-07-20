@@ -22,7 +22,7 @@ jobs:
 
       - name: Py repo'sunu klonla
         run: |
-          git clone https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/opitiopiti/Py.git private_py
+          git clone https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/opitiopiti/tumsistem.git private_py
 
       - name: requests kütüphanesini yükle
         run: pip install requests
