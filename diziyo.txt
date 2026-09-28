@@ -1,1 +1,1 @@
-https://www.diziyo.so
+https://www.diziyo.so:443/login_up.php
