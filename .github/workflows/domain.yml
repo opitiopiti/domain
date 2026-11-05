@@ -1,40 +1,140 @@
-name: Domain Check
+name: Domain Kontrol ve Guncelleme
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: domain-kontrol
+  cancel-in-progress: false
+
 jobs:
-  run-domain-check:
+  kontrol:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Repoyu indir
+        uses: actions/checkout@v4
         with:
-          python-version: "3.11"
+          ref: main
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Run domain script
-        run: |
-          python domain.py
+      - name: Requests kur
+        run: python -m pip install requests
 
-      - name: Commit changes
+      - name: TXT domainlerini GET ile kontrol et
+        shell: bash
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git diff --cached --quiet || git commit -m "Update domains with final URLs"
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.parse import urlsplit, urlunsplit
+          import requests
 
-      - name: Push changes
+          session = requests.Session()
+          session.headers.update({
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+          })
+
+          def normalize_host(host):
+              return (host or "").lower().removeprefix("www.")
+
+          def get_new_domain(value):
+              has_scheme = value.lower().startswith(("https://", "http://"))
+              url = value if has_scheme else "https://" + value
+              parsed = urlsplit(url)
+
+              if parsed.scheme not in ("http", "https") or not parsed.hostname:
+                  return None
+              if "." not in parsed.hostname or parsed.username or parsed.password:
+                  return None
+              if any(c.isspace() for c in value):
+                  return None
+
+              headers = {"Referer": f"{parsed.scheme}://{parsed.netloc}/"}
+              try:
+                  with session.get(
+                      url,
+                      headers=headers,
+                      allow_redirects=True,
+                      timeout=(8, 15),
+                      stream=True,
+                  ) as response:
+                      final = urlsplit(response.url)
+                      if not response.history or response.status_code >= 400:
+                          return None
+                      if not final.hostname or normalize_host(final.hostname) == normalize_host(parsed.hostname):
+                          return None
+                      if final.scheme not in ("http", "https"):
+                          return None
+
+                      suffix = urlunsplit(("", "", parsed.path, parsed.query, parsed.fragment))
+                      prefix = f"{final.scheme}://" if has_scheme else ""
+                      return f"{prefix}{final.netloc}{suffix}"
+              except requests.RequestException as exc:
+                  print(f"  [HATA] {value}: {exc}")
+                  return None
+
+          cache = {}
+          file_count = 0
+          update_count = 0
+
+          for path in sorted(Path(".").rglob("*.txt")):
+              if ".git" in path.parts or ".github" in path.parts:
+                  continue
+              with path.open("r", encoding="utf-8-sig", newline="") as f:
+                  original_lines = f.readlines()
+
+              new_lines = []
+              file_changed = False
+
+              for line in original_lines:
+                  value = line.strip()
+                  if not value or value.startswith("#"):
+                      new_lines.append(line)
+                      continue
+                  if value not in cache:
+                      cache[value] = get_new_domain(value)
+                  new_value = cache[value]
+
+                  if new_value and new_value != value:
+                      newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+                      new_lines.append(new_value + newline)
+                      print(f"[GUNCELLENDI] {path}: {value} -> {new_value}")
+                      update_count += 1
+                      file_changed = True
+                  else:
+                      new_lines.append(line)
+                      print(f"[DEGISMEDI] {path}: {value}")
+
+              if file_changed:
+                  with path.open("w", encoding="utf-8", newline="") as f:
+                      f.writelines(new_lines)
+                  file_count += 1
+
+          print(f"\nSONUC: {len(cache)} adres kontrol edildi, {file_count} dosyada {update_count} domain guncellendi.")
+          PY
+
+      - name: Degisiklikleri GitHub'a kaydet
+        shell: bash
         run: |
-          git push
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          if git diff --cached --quiet; then
+            echo "Guncellenecek domain yok."
+            exit 0
+          fi
+          git commit -m "chore: update redirected domains"
+          git pull --rebase origin main
+          git push origin HEAD:main
