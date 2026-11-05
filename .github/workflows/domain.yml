@@ -8,10 +8,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: domain-kontrol
-  cancel-in-progress: false
-
 jobs:
   kontrol:
     runs-on: ubuntu-latest
