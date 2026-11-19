@@ -2,8 +2,8 @@ name: Domain Kontrol ve Guncelleme
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 */6 * * *"
+#  schedule:
+#    - cron: "17 */6 * * *"
 
 permissions:
   contents: write
